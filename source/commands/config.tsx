@@ -8,6 +8,7 @@ import {
 	setConfigValue,
 	configExists,
 } from '../lib/config.js';
+import {ResearchManager} from '../lib/research/manager.js';
 
 export const metadata = {
 	name: 'config',
@@ -23,11 +24,13 @@ Commands:
   (none)     Show current configuration
   set        Set a configuration value
   reset      Reset to default configuration
+  delete     Delete a research session
 
 Examples:
   $ research-cli config
   $ research-cli config set research.depth deep
   $ research-cli config reset
+  $ research-cli config delete <research-id>
 
 Configuration paths:
   research.depth            quick, medium, deep
@@ -125,6 +128,40 @@ function ResetConfig() {
 	);
 }
 
+function DeleteConfig({args}: {args: string[]}) {
+	if (args.length === 0) {
+		return (
+			<Box flexDirection="column">
+				<Text color="red">Error: Research ID required</Text>
+				<Text dimColor>Usage: config delete &lt;research-id&gt;</Text>
+				<Text dimColor>
+					Example: config delete quantum-computing-2024-02-12-a1b2c3
+				</Text>
+			</Box>
+		);
+	}
+
+	const id = args[0]!;
+	const success = ResearchManager.delete(id);
+
+	if (success) {
+		return (
+			<Box flexDirection="column">
+				<Text color="green">✔ Research session deleted</Text>
+				<Text>ID: {id}</Text>
+			</Box>
+		);
+	}
+
+	return (
+		<Box flexDirection="column">
+			<Text color="red">Error: Research session not found</Text>
+			<Text dimColor>ID: {id}</Text>
+			<Text dimColor>Run 'research-cli list' to see available sessions</Text>
+		</Box>
+	);
+}
+
 export default function ConfigCommand({args}: CommandProps) {
 	const subcommand = args[0];
 	const remainingArgs = args.slice(1);
@@ -143,11 +180,15 @@ export default function ConfigCommand({args}: CommandProps) {
 			return <ResetConfig />;
 		}
 
+		case 'delete': {
+			return <DeleteConfig args={remainingArgs} />;
+		}
+
 		default: {
 			return (
 				<Box flexDirection="column">
 					<Text color="red">Error: Unknown subcommand: {subcommand}</Text>
-					<Text dimColor>Valid subcommands: set, reset</Text>
+					<Text dimColor>Valid subcommands: set, reset, delete</Text>
 				</Box>
 			);
 		}
