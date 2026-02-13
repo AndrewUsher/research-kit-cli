@@ -176,11 +176,194 @@ A terminal-based research assistant that searches the web, analyzes documents, s
 
 #### 4.1 Content Analysis
 
-- [ ] Key finding extraction from sources
-- [ ] Theme identification and grouping
-- [ ] Claim extraction with source attribution
-- [ ] Sentiment/context analysis
-- [ ] Entity recognition (names, organizations, etc.)
+**Goal:** Implement intelligent content analysis using Vercel AI SDK with Amazon Bedrock to extract findings, themes, claims, and entities from research sources.
+
+**Architecture Decisions:**
+
+- Analysis results stored as separate `SourceAnalysis` objects
+- Sequential processing (one source at a time)
+- LLM-based analysis with per-task temperature settings
+- Context window chunk overlap for document continuity
+- Cache analysis results by content hash
+- Mark-and-exclude strategy for failed sources
+
+**Technical Stack:**
+
+- Vercel AI SDK (`ai`, `@ai-sdk/amazon-bedrock`)
+- Zod for runtime validation and TypeScript inference
+- Amazon Nova Pro via Bedrock (`amazon.nova-pro-v1:0`)
+
+**Temperature Settings (per-task):**
+
+- Entity extraction: 0.1 (factual, precise)
+- Claim extraction: 0.1 (factual, precise)
+- Theme identification: 0.5 (creative but grounded)
+- Sentiment analysis: 0.3 (interpretive but conservative)
+
+**4.1.1 Data Models & Types**
+
+Zod schemas for runtime validation:
+
+- `SourceAnalysis`: Complete analysis for a single source
+- `Finding`: Key discoveries with importance levels
+- `Theme`: Dynamically discovered topic clusters
+- `Claim`: Sentence-level statements with types (fact/opinion/prediction/statistic)
+- `Entity`: Domain-specific entities with mentions
+- `Sentiment`: Context-aware sentiment toward specific targets
+
+**4.1.2 Document Chunking**
+
+Chunker configuration:
+
+- Max chunk size: 4000 tokens (~16000 chars)
+- Context window carryover: Top 5 findings from previous chunk
+- Splits at paragraph boundaries when possible
+- Maintains citation positions
+
+**4.1.3 Analysis Engine**
+
+Core components:
+
+1. **AnalysisEngine**: Orchestrates the analysis pipeline
+2. **Chunker**: Splits documents with context carryover
+3. **PromptBuilder**: Creates structured LLM prompts
+4. **ResponseParser**: Parses and validates LLM responses with Zod
+5. **ConfidenceCalculator**: Hybrid scoring algorithm
+6. **AnalysisCache**: Content-hash-based caching
+
+**4.1.4 Analysis Pipeline**
+
+Stages:
+
+1. **Document Preparation**: Load content, check cache, apply chunking
+2. **LLM Analysis** (per chunk): Extract findings, themes, claims, entities
+3. **Result Aggregation**: Merge chunk results, deduplicate, calculate confidence
+4. **Storage**: Embed analysis in research session JSON
+
+**4.1.5 Confidence Scoring Algorithm**
+
+Hybrid formula:
+
+```
+confidence = (
+  sourceCredibility * 0.3 +
+  llmConfidence * 0.3 +
+  evidenceStrength * 0.2 +
+  crossSourceConsensus * 0.2  // Populated by Phase 4.2
+)
+```
+
+**4.1.6 Analysis Stages & UI**
+
+Progress display:
+
+1. "Preparing documents for analysis..."
+2. "Analyzing source X/Y: [title]..."
+3. "Identifying themes and patterns..."
+4. "Extracting claims and entities..."
+5. "Analyzing sentiment and context..."
+6. "Calculating confidence scores..."
+
+**4.1.7 Error Handling**
+
+Mark-and-exclude strategy:
+
+- Failed sources marked with `status: 'failed'`
+- Error logged with source ID and stage
+- Research continues with remaining sources
+- Failed sources excluded from synthesis (Phase 4.2)
+
+**4.1.8 Transparency Logging**
+
+Verbosity levels:
+
+- **minimal**: Only errors and stage changes
+- **normal**: Summary counts and key operations
+- **detailed**: All LLM prompts, responses, and reasoning
+
+**4.1.9 Implementation Tasks**
+
+- [ ] Install dependencies: `ai`, `@ai-sdk/amazon-bedrock`, `zod`
+- [ ] Create analysis types with Zod schemas
+- [ ] Implement document chunker with context carryover
+- [ ] Create LLM prompt templates
+- [ ] Build response parser with Zod validation
+- [ ] Implement analysis engine core
+- [ ] Add per-task temperature configuration
+- [ ] Implement token usage tracking
+- [ ] Build confidence scoring algorithm
+- [ ] Create analysis cache system
+- [ ] Integrate with research session storage
+- [ ] Add stage-based progress indicators
+- [ ] Implement transparency logging
+- [ ] Create error handling (mark and exclude)
+- [ ] Write tests with mock LLM responses
+- [ ] Add analysis configuration options
+
+**4.1.10 File Structure**
+
+```
+source/lib/analysis/
+├── types.ts              # Zod schemas and TypeScript types
+├── engine.ts             # Core analysis orchestration
+├── chunker.ts            # Document chunking logic
+├── prompts.ts            # LLM prompt templates
+├── parser.ts             # Response parsing utilities
+├── confidence.ts         # Confidence scoring algorithms
+├── cache.ts              # Analysis caching
+├── config.ts             # Analysis configuration
+├── __tests__/
+│   ├── chunker.test.ts
+│   ├── engine.test.ts
+│   └── mocks/
+│       └── responses.ts
+└── index.ts
+```
+
+**4.1.11 Configuration**
+
+Add to `~/.research-cli/config.yaml`:
+
+```yaml
+analysis:
+  enabled: true
+  model: 'amazon.nova-pro-v1:0'
+  chunking:
+    max_chunk_size: 4000
+    overlap_findings: 5
+  temperatures:
+    entity: 0.1
+    claim: 0.1
+    theme: 0.5
+    sentiment: 0.3
+  limits:
+    max_entities_per_source: 50
+    max_findings_per_source: 30
+  confidence:
+    threshold: 0.6
+  transparency: normal
+  caching:
+    enabled: true
+```
+
+**4.1.12 Testing Strategy**
+
+- Mock LLM responses for deterministic tests
+- Test document chunking with various sizes
+- Test context carryover between chunks
+- Test cache hit/miss scenarios
+- Test error handling and recovery
+- Test confidence scoring calculations
+
+**Deliverables:**
+
+- Source analysis produces structured findings, themes, claims, entities
+- Token usage tracked and displayed per source
+- Failed analyses don't stop overall research
+- Progress clearly shown at each stage
+- All analysis data embedded in research session
+- Tests pass with mock LLM responses
+- Analysis completes in < 30 seconds per source on average
 
 #### 4.2 Synthesis Engine
 

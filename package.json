@@ -18,6 +18,8 @@
 		"dist"
 	],
 	"dependencies": {
+		"@ai-sdk/amazon-bedrock": "^4.0.59",
+		"ai": "^6.0.85",
 		"cheerio": "^1.2.0",
 		"exa-js": "^2.3.0",
 		"ink": "^4.1.0",
@@ -25,7 +27,8 @@
 		"meow": "^11.0.0",
 		"pdf-parse": "^2.4.5",
 		"puppeteer": "^24.37.2",
-		"react": "^18.2.0"
+		"react": "^18.2.0",
+		"zod": "^4.3.6"
 	},
 	"devDependencies": {
 		"@sindresorhus/tsconfig": "^3.0.1",
