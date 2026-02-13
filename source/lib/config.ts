@@ -56,6 +56,8 @@ function applyEnvOverrides(config: Config): Config {
 		'research.autonomy': getEnvValue('research.autonomy'),
 		'output.format': getEnvValue('output.format'),
 		'output.directory': getEnvValue('output.directory'),
+		'search.provider': getEnvValue('search.provider'),
+		'search.api_key': getEnvValue('search.api_key'),
 	};
 
 	const configCopy = JSON.parse(JSON.stringify(config)) as Config;

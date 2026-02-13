@@ -8,6 +8,10 @@ export type Config = {
 		format: 'markdown' | 'json';
 		directory: string;
 	};
+	search: {
+		provider: 'exa';
+		api_key?: string;
+	};
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -19,5 +23,8 @@ export const DEFAULT_CONFIG: Config = {
 	output: {
 		format: 'markdown',
 		directory: './research_output',
+	},
+	search: {
+		provider: 'exa',
 	},
 };

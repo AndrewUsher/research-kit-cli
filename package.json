@@ -19,6 +19,7 @@
 	],
 	"dependencies": {
 		"cheerio": "^1.2.0",
+		"exa-js": "^2.3.0",
 		"ink": "^4.1.0",
 		"js-yaml": "^4.1.1",
 		"meow": "^11.0.0",

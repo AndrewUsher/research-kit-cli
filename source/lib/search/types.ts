@@ -3,6 +3,7 @@ export type SearchDepth = 'quick' | 'medium' | 'deep';
 export type SearchOptions = {
 	query: string;
 	depth: SearchDepth;
+	apiKey?: string;
 };
 
 export type SearchResult = {

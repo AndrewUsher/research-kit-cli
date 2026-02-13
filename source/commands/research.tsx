@@ -88,6 +88,7 @@ export default function ResearchCommand({args, config}: CommandProps) {
 			const searchResults = await search({
 				query: topic,
 				depth: config.research.depth,
+				apiKey: config.search.api_key,
 			});
 
 			setState({type: 'searching', progress: 100});
