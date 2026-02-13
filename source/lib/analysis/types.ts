@@ -134,3 +134,39 @@ export type AnalysisError = {
 	error: Error;
 	recoverable: boolean;
 };
+
+// Synthesis types (Phase 4.2)
+export const ResearchGapSchema = z.object({
+	topic: z.string(),
+	description: z.string(),
+	importance: z.enum(['high', 'medium', 'low']),
+	suggestedSearchTerms: z.array(z.string()),
+});
+
+export const ClaimConflictSchema = z.object({
+	claimA: ClaimSchema,
+	claimB: ClaimSchema,
+	sourceA: z.string(),
+	sourceB: z.string(),
+	resolution: z.string().optional(),
+});
+
+export const EnhancedResearchAnalysisSchema = z.object({
+	sessionId: z.string(),
+	sourceAnalyses: z.array(SourceAnalysisSchema),
+	globalThemes: z.array(ThemeSchema),
+	verifiedClaims: z.array(VerifiedClaimSchema),
+	entityGraph: EntityGraphSchema,
+	identifiedGaps: z.array(ResearchGapSchema),
+	conflicts: z.array(ClaimConflictSchema),
+	summary: z.string(),
+	totalTokensUsed: z.number(),
+	analysisDuration: z.number(),
+	completedAt: z.string().datetime(),
+});
+
+export type ResearchGap = z.infer<typeof ResearchGapSchema>;
+export type ClaimConflict = z.infer<typeof ClaimConflictSchema>;
+export type EnhancedResearchAnalysis = z.infer<
+	typeof EnhancedResearchAnalysisSchema
+>;

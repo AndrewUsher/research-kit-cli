@@ -367,11 +367,301 @@ analysis:
 
 #### 4.2 Synthesis Engine
 
-- [ ] Cross-reference fact-checking
-- [ ] Confidence scoring algorithm
-- [ ] Conflict detection between sources
-- [ ] Evidence weighing for claims
-- [ ] Gap identification in research
+**Goal:** Synthesize findings from multiple sources into coherent insights using LLM-based comprehensive analysis.
+
+**Architecture Decisions:**
+
+- Single LLM synthesis call to process all source analyses together
+- Pairwise comparison for cross-source fact-checking
+- LLM-based claim verification and conflict resolution
+- LLM-identified gaps in research coverage
+- Co-occurrence-based entity relationship detection
+- LLM-guided theme merging and organization
+- Source credibility-only evidence weighting
+- Contradictions flagged and documented (both perspectives presented)
+- Enhanced ResearchAnalysis type for structured output
+
+**4.2.1 Synthesis Engine Core**
+
+Create `source/lib/synthesis/engine.ts`:
+
+```typescript
+export type SynthesisEngine = {
+	synthesize(
+		sourceAnalyses: SourceAnalysis[],
+		context: SynthesisContext,
+	): Promise<ResearchAnalysis>;
+};
+
+export type SynthesisContext = {
+	researchTopic: string;
+	sessionId: string;
+	sources: Source[]; // Original sources for credibility data
+};
+```
+
+**4.2.2 Data Models**
+
+Enhanced ResearchAnalysis type (already partially defined in types.ts):
+
+```typescript
+export type ResearchAnalysis = {
+	sessionId: string;
+	sourceAnalyses: SourceAnalysis[];
+
+	// Synthesis results
+	globalThemes: Theme[]; // Aggregated and merged themes
+	verifiedClaims: VerifiedClaim[]; // Claims with cross-source verification
+	entityGraph: EntityGraph; // Entity relationships
+
+	// Gap analysis
+	identifiedGaps: ResearchGap[];
+
+	// Conflict tracking
+	conflicts: ClaimConflict[];
+
+	// Metadata
+	totalTokensUsed: number;
+	analysisDuration: number;
+	completedAt: string;
+};
+
+export type ResearchGap = {
+	topic: string;
+	description: string;
+	importance: 'high' | 'medium' | 'low';
+	suggestedSearchTerms: string[];
+};
+
+export type ClaimConflict = {
+	claimA: Claim;
+	claimB: Claim;
+	sourceA: string;
+	sourceB: string;
+	resolution?: string; // LLM-mediated resolution if available
+};
+```
+
+**4.2.3 LLM Synthesis Prompt**
+
+Comprehensive prompt that handles all synthesis in one call:
+
+```typescript
+export const SYNTHESIS_PROMPT = `
+Analyze the following source analyses about "${topic}" and synthesize comprehensive findings.
+
+Source Analyses:
+{{#each sourceAnalyses}}
+---
+Source: {{title}}
+Credibility: {{credibility}}
+Findings: {{#each findings}}- {{content}} ({{importance}})
+{{/each}}
+Themes: {{#each themes}}- {{name}}: {{description}}
+{{/each}}
+Claims: {{#each claims}}- {{statement}} ({{type}}, confidence: {{confidence}})
+{{/each}}
+Entities: {{#each entities}}- {{name}} ({{type}})
+{{/each}}
+{{/each}}
+
+Perform the following synthesis tasks:
+
+1. **Theme Aggregation**: Merge similar themes across sources, identify dominant themes
+2. **Claim Verification**: For each claim, identify:
+   - Supporting sources and their credibility
+   - Conflicting sources and their credibility
+   - Verification status (confirmed/disputed/unverified)
+3. **Conflict Detection**: Identify contradictory claims and document both perspectives
+4. **Gap Identification**: What important aspects of "${topic}" are not covered?
+5. **Entity Relationships**: Build relationships between entities based on co-occurrence
+6. **Evidence Weighing**: Calculate evidence strength based on source credibility
+
+Return a JSON object with:
+{
+  "globalThemes": [{name, description, confidence, sourceCount, relatedFindingIds}],
+  "verifiedClaims": [{
+    originalClaim: {...},
+    supportingSources: [{sourceId, credibility}],
+    conflictingSources: [{sourceId, credibility}],
+    verificationStatus: "confirmed|disputed|unverified",
+    resolvedStatement?: string
+  }],
+  "entityGraph": {
+    nodes: [{id, name, type, mentionCount}],
+    edges: [{source, target, relationship, strength}]
+  },
+  "identifiedGaps": [{topic, description, importance, suggestedSearchTerms}],
+  "conflicts": [{
+    claimA: {...},
+    claimB: {...},
+    sourceA: "source title",
+    sourceB: "source title",
+    resolution: "optional LLM resolution"
+  }],
+  "summary": "2-3 paragraph synthesis of key findings"
+}
+`;
+```
+
+**4.2.4 Evidence Weighing**
+
+Algorithm using source credibility only:
+
+```typescript
+export function weighEvidence(
+	claim: Claim,
+	supportingSources: Source[],
+	conflictingSources: Source[],
+): number {
+	const supportingWeight = supportingSources.reduce(
+		(sum, s) => sum + s.credibility,
+		0,
+	);
+	const conflictingWeight = conflictingSources.reduce(
+		(sum, s) => sum + s.credibility,
+		0,
+	);
+
+	const total = supportingWeight + conflictingWeight;
+	if (total === 0) return 0;
+
+	return supportingWeight / total;
+}
+```
+
+**4.2.5 Entity Graph Construction**
+
+Co-occurrence-based relationship building:
+
+```typescript
+export function buildEntityGraph(analyses: SourceAnalysis[]): EntityGraph {
+	const nodes: EntityNode[] = [];
+	const edges: EntityEdge[] = [];
+	const entityMap = new Map<string, EntityNode>();
+
+	// Count mentions
+	for (const analysis of analyses) {
+		for (const entity of analysis.entities) {
+			const existing = entityMap.get(entity.name);
+			if (existing) {
+				existing.mentionCount += entity.mentions.length;
+			} else {
+				entityMap.set(entity.name, {
+					id: entity.id,
+					name: entity.name,
+					type: entity.type,
+					mentionCount: entity.mentions.length,
+				});
+			}
+		}
+	}
+
+	// Build co-occurrence edges (within same source)
+	for (const analysis of analyses) {
+		const entityNames = analysis.entities.map(e => e.name);
+		for (let i = 0; i < entityNames.length; i++) {
+			for (let j = i + 1; j < entityNames.length; j++) {
+				edges.push({
+					source: entityNames[i],
+					target: entityNames[j],
+					relationship: 'co-occurs',
+					strength: 0.5,
+				});
+			}
+		}
+	}
+
+	return {nodes: Array.from(entityMap.values()), edges};
+}
+```
+
+**4.2.6 Gap Identification**
+
+LLM-driven gap detection:
+
+```typescript
+export const GAP_IDENTIFICATION_PROMPT = `
+Based on the research topic "${topic}" and the following covered themes:
+{{coveredThemes}}
+
+Identify important aspects of "${topic}" that are NOT adequately covered.
+Consider:
+- Related subtopics that should be explored
+- Contradictions that need more investigation
+- Emerging questions from the current findings
+
+Return JSON:
+{
+  "gaps": [{
+    "topic": "specific aspect",
+    "description": "why this matters",
+    "importance": "high|medium|low",
+    "suggestedSearchTerms": ["term1", "term2"]
+  }]
+}
+`;
+```
+
+**4.2.7 Implementation Tasks**
+
+- [ ] Create synthesis types (ResearchAnalysis, Gap, Conflict)
+- [ ] Implement synthesis engine core
+- [ ] Build comprehensive LLM synthesis prompt
+- [ ] Implement evidence weighing (credibility-only)
+- [ ] Build entity graph from co-occurrence
+- [ ] Add gap identification prompt
+- [ ] Implement conflict detection and documentation
+- [ ] Add synthesis to research session workflow
+- [ ] Create synthesis progress indicators
+- [ ] Write tests with mock source analyses
+
+**4.2.8 File Structure**
+
+```
+source/lib/synthesis/
+├── types.ts           # Enhanced ResearchAnalysis types
+├── engine.ts          # Core synthesis orchestration
+├── prompts.ts         # Synthesis prompts
+├── verifier.ts        # Claim verification logic
+├── conflicts.ts       # Conflict detection
+├── gaps.ts            # Gap identification
+├── entities.ts        # Entity graph builder
+├── evidence.ts        # Evidence weighing
+└── __tests__/
+    └── engine.test.ts
+```
+
+**4.2.9 Integration with Phase 4.1**
+
+The synthesis engine takes output from 4.1:
+
+- `SourceAnalysis[]` from analysis engine
+- `Source.credibility` for evidence weighing
+- `Finding`, `Theme`, `Claim`, `Entity` for synthesis
+
+**4.2.10 Configuration**
+
+Add to config:
+
+```yaml
+synthesis:
+  enabled: true
+  include_gaps: true
+  include_conflicts: true
+  max_conflicts: 10
+  entity_graph:
+    min_mentions: 2
+```
+
+**Deliverables:**
+
+- All source analyses synthesized into coherent ResearchAnalysis
+- Claims verified against multiple sources with credibility weights
+- Contradictions identified and documented (both perspectives)
+- Gaps in research identified with suggested terms
+- Entity relationships mapped
+- Tests pass with mock data
 
 #### 4.3 AI Integration
 
