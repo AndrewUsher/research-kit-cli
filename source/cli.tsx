@@ -44,7 +44,7 @@ const cli = meow(
 	},
 );
 
-render(
+const {waitUntilExit} = render(
 	<App
 		args={cli.input}
 		flags={{
@@ -53,4 +53,14 @@ render(
 			interactive: cli.flags.interactive,
 		}}
 	/>,
+);
+
+// Handle exit codes
+waitUntilExit().then(
+	() => {
+		process.exit(0);
+	},
+	() => {
+		process.exit(1);
+	},
 );
