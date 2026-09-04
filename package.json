@@ -18,7 +18,7 @@
 		"dist"
 	],
 	"dependencies": {
-		"@ai-sdk/amazon-bedrock": "^4.0.59",
+		"@ai-sdk/amazon-bedrock": "^4.0.170",
 		"ai": "^6.0.85",
 		"cheerio": "^1.2.0",
 		"exa-js": "^2.3.0",
