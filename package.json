@@ -19,7 +19,7 @@
 	],
 	"dependencies": {
 		"@ai-sdk/amazon-bedrock": "^4.0.59",
-		"ai": "^6.0.85",
+		"ai": "^6.0.276",
 		"cheerio": "^1.2.0",
 		"exa-js": "^2.3.0",
 		"ink": "^4.1.0",
